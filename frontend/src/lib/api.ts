@@ -1,10 +1,33 @@
 /**
  * StageTix API Service
  * Connects Next.js frontend to Laravel 11 REST API backend
- * Backend URL: http://127.0.0.1:8000/api/v1
+ * Supports Vercel Multi-Services Binding (BACKEND_SERVICE_URL) on server-side
+ * and relative path (/api/v1) or NEXT_PUBLIC_API_URL on client-side.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+function getApiBase(): string {
+  if (typeof window === 'undefined') {
+    // Server-side (SSR / Server Component / Serverless Function)
+    if (process.env.BACKEND_SERVICE_URL) {
+      return `${process.env.BACKEND_SERVICE_URL.replace(/\/$/, '')}/api/v1`;
+    }
+    return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+  }
+  
+  // Client-side (Browser)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // In production on Vercel with rewrites, relative path avoids CORS
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api/v1';
+  }
+
+  return 'http://127.0.0.1:8000/api/v1';
+}
+
+const API_BASE = getApiBase();
 
 // ─── Generic fetch wrapper ────────────────────────────────────────────────────
 
@@ -12,7 +35,8 @@ async function apiFetch<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const url = `${API_BASE}${endpoint}`;
+  const base = typeof window === 'undefined' ? getApiBase() : API_BASE;
+  const url = `${base}${endpoint}`;
 
   const res = await fetch(url, {
     headers: {
