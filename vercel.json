@@ -3,8 +3,7 @@
   "services": {
     "backend": {
       "root": "backend",
-      "runtime": "vercel-php@0.7.3",
-      "entrypoint": "public/index.php"
+      "runtime": "container"
     },
     "frontend": {
       "root": "frontend",
@@ -34,4 +33,3 @@
     }
   ]
 }
-
