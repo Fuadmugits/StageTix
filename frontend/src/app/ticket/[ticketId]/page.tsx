@@ -23,8 +23,6 @@ import { Loader2 } from 'lucide-react';
 export default function TicketPage({ params }: { params: Promise<{ ticketId: string }> }) {
   const resolvedParams = use(params);
   const [ticket, setTicket] = React.useState<any>(null);
-  const [allTickets, setAllTickets] = React.useState<any[]>([]);
-  const [activeTicketIndex, setActiveTicketIndex] = React.useState<number>(0);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -36,7 +34,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
       .then((res: any) => {
         if (!cancelled && res.data) {
           const t = res.data;
-          const mainTicket = {
+          setTicket({
             id: t.ticket_code,
             orderId: t.order?.order_number || String(t.order_id),
             concertTitle: t.order?.concert?.title || 'Concert E-Ticket',
@@ -49,22 +47,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
             holderName: t.holder_name,
             qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(t.ticket_code)}`,
             status: t.status,
-          };
-
-          const list = (res.all_tickets && res.all_tickets.length > 0)
-            ? res.all_tickets.map((item: any) => ({
-                ...mainTicket,
-                id: item.ticket_code,
-                tierName: item.tier_name,
-                seatNumber: item.seat_number,
-                holderName: item.holder_name,
-                status: item.status,
-                qrCode: item.qr_code,
-              }))
-            : [mainTicket];
-
-          setTicket(mainTicket);
-          setAllTickets(list);
+          });
         }
       })
       .catch(() => {
@@ -80,26 +63,20 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 const qty = parsed.items?.[0]?.quantity || 1;
                 const baseId = resolvedParams.ticketId || lastTicketCode || parsed.id;
                 
-                const list = [];
-                for (let i = 1; i <= qty; i++) {
-                  const uniqueCode = qty > 1 ? `${baseId}-T${i}` : baseId;
-                  list.push({
-                    id: uniqueCode,
-                    orderId: parsed.id,
-                    concertTitle: parsed.concertTitle,
-                    artist: 'Official Performer',
-                    venue: parsed.concertVenue,
-                    date: parsed.concertDate,
-                    time: '19:00 WIB',
-                    tierName: parsed.tierName,
-                    seatNumber: qty > 1 ? `Gate A - Main Entrance • Seat #0${i}` : 'Gate A - Main Entrance',
-                    holderName: qty > 1 ? `${parsed.customer?.fullName || 'Ticket Holder'} (Tiket ${i})` : (parsed.customer?.fullName || 'Ticket Holder'),
-                    qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(uniqueCode)}`,
-                    status: 'ACTIVE',
-                  });
-                }
-                setTicket(list[0]);
-                setAllTickets(list);
+                setTicket({
+                  id: baseId,
+                  orderId: parsed.id,
+                  concertTitle: parsed.concertTitle,
+                  artist: 'Official Performer',
+                  venue: parsed.concertVenue,
+                  date: parsed.concertDate,
+                  time: '19:00 WIB',
+                  tierName: parsed.tierName + (qty > 1 ? ` (${qty} Pax)` : ''),
+                  seatNumber: 'Gate A - Main Entrance',
+                  holderName: parsed.customer?.fullName || 'Ticket Holder',
+                  qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(baseId)}`,
+                  status: 'ACTIVE',
+                });
                 return;
               } catch (e) {
                 console.error(e);
@@ -150,8 +127,6 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
     );
   }
 
-  const activeTicket = allTickets[activeTicketIndex] || ticket;
-
   return (
     <div className="py-10 pb-24 space-y-8">
       <div className="container-custom max-w-3xl">
@@ -169,42 +144,6 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
           </div>
         </div>
 
-        {/* Multi-Ticket Selector Tabs if user bought > 1 ticket */}
-        {allTickets.length > 1 && (
-          <div className="mb-6 p-4 rounded-2xl glass-card border border-cyan-500/30 space-y-3 bg-[#131318]">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white flex items-center gap-2">
-                <TicketIcon className="w-4 h-4 text-cyan-400" />
-                Daftar Tiket Anda ({allTickets.length} Lembar Tiket Mandiri)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">
-                Tiap tiket memiliki kode &amp; QR unik terpisah
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {allTickets.map((t, idx) => (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTicketIndex(idx)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                    activeTicketIndex === idx
-                      ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20 scale-105'
-                      : 'bg-slate-900 text-slate-300 border border-slate-700 hover:border-slate-500'
-                  }`}
-                >
-                  <span>Tiket #{idx + 1}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    t.status === 'USED' ? 'bg-rose-900/80 text-rose-200' : 'bg-black/30 text-emerald-300'
-                  }`}>
-                    {t.status === 'USED' ? 'USED' : 'READY'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* E-Ticket Card Wrapper */}
         <div className="relative rounded-3xl overflow-hidden glass-card shadow-2xl" style={{ border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
           
@@ -216,14 +155,14 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
               </div>
               <div>
                 <span className="text-lg font-bold tracking-tight uppercase" style={{ color: 'var(--text-primary)' }}>
-                  E-Ticket Konser Resmi {allTickets.length > 1 ? `(Tiket ${activeTicketIndex + 1} dari ${allTickets.length})` : ''}
+                  E-Ticket Konser Resmi
                 </span>
-                <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>No. Tiket Unik: {activeTicket.id}</div>
+                <div className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>No. Tiket: {ticket.id}</div>
               </div>
             </div>
 
             <span className="text-xs font-bold uppercase px-3 py-1 rounded-full" style={{ background: 'var(--success-subtle)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-              {activeTicket.status === 'ACTIVE' ? 'Tiket Aktif' : activeTicket.status}
+              {ticket.status === 'ACTIVE' ? 'Tiket Aktif' : ticket.status}
             </span>
           </div>
 
@@ -233,10 +172,10 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
             {/* Event Header */}
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
-                {activeTicket.artist}
+                {ticket.artist}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-                {activeTicket.concertTitle}
+                {ticket.concertTitle}
               </h1>
             </div>
 
@@ -244,12 +183,12 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
             <div className="p-4 sm:p-5 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
               <div>
                 <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Kategori Tiket</div>
-                <div className="text-lg font-extrabold mt-0.5" style={{ color: 'var(--text-primary)' }}>{activeTicket.tierName}</div>
+                <div className="text-lg font-extrabold mt-0.5" style={{ color: 'var(--text-primary)' }}>{ticket.tierName}</div>
               </div>
 
               <div>
                 <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Pintu Masuk / Gate</div>
-                <div className="text-lg font-mono font-extrabold mt-0.5" style={{ color: 'var(--text-primary)' }}>{activeTicket.seatNumber}</div>
+                <div className="text-lg font-mono font-extrabold mt-0.5" style={{ color: 'var(--text-primary)' }}>{ticket.seatNumber}</div>
               </div>
             </div>
 
@@ -259,7 +198,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 <Calendar className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                 <div>
                   <div className="font-medium" style={{ color: 'var(--text-muted)' }}>Tanggal Konser</div>
-                  <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{activeTicket.date}</div>
+                  <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{ticket.date}</div>
                 </div>
               </div>
 
@@ -267,7 +206,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 <Clock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
                 <div>
                   <div className="font-medium" style={{ color: 'var(--text-muted)' }}>Waktu Masuk</div>
-                  <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{activeTicket.time}</div>
+                  <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{ticket.time}</div>
                 </div>
               </div>
 
@@ -275,7 +214,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 <User className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
                 <div>
                   <div className="font-medium" style={{ color: 'var(--text-muted)' }}>Nama Pemegang Tiket</div>
-                  <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{activeTicket.holderName}</div>
+                  <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{ticket.holderName}</div>
                 </div>
               </div>
             </div>
@@ -285,7 +224,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
               <MapPin className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
               <div>
                 <div className="font-medium" style={{ color: 'var(--text-muted)' }}>Lokasi / Venue</div>
-                <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{activeTicket.venue}</div>
+                <div className="font-bold text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>{ticket.venue}</div>
               </div>
             </div>
 
@@ -295,13 +234,13 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 <div className="bg-white p-4 inline-block rounded-2xl shadow-xl border" style={{ borderColor: 'var(--border-color)' }}>
                   <img 
                     id="ticket-qr-img"
-                    src={activeTicket.qrCode} 
+                    src={ticket.qrCode} 
                     alt="QR Code Tiket" 
                     className="w-48 h-48 mx-auto object-contain"
                     crossOrigin="anonymous"
                   />
                 </div>
-                {activeTicket.status === 'USED' && (
+                {ticket.status === 'USED' && (
                   <div className="absolute inset-0 bg-black/75 rounded-2xl flex flex-col items-center justify-center p-4 backdrop-blur-sm">
                     <span className="px-3 py-1 bg-rose-600 text-white text-xs font-black uppercase rounded-lg shadow-lg tracking-wider mb-1">
                       SUDAH DIGUNAKAN
@@ -319,19 +258,19 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                   type="button"
                   onClick={async () => {
                     try {
-                      const response = await fetch(activeTicket.qrCode);
+                      const response = await fetch(ticket.qrCode);
                       const blob = await response.blob();
                       const url = window.URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `QR-Tiket-${activeTicket.id}.png`;
+                      a.download = `QR-Tiket-${ticket.id}.png`;
                       document.body.appendChild(a);
                       a.click();
                       document.body.removeChild(a);
                       window.URL.revokeObjectURL(url);
                     } catch {
                       // Fallback: open in new tab
-                      window.open(activeTicket.qrCode, '_blank');
+                      window.open(ticket.qrCode, '_blank');
                     }
                   }}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm hover:scale-105"
@@ -342,14 +281,14 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                   }}
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Simpan Gambar QR Code #{activeTicketIndex + 1} (PNG)
+                  Simpan Gambar QR Code (PNG)
                 </button>
               </div>
 
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono text-sm font-bold" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
                   <span>KODE:</span>
-                  <span className="select-all tracking-wider">{activeTicket.id}</span>
+                  <span className="select-all tracking-wider">{ticket.id}</span>
                 </div>
                 <div className="text-xs font-semibold flex items-center justify-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                   <QrCode className="w-4 h-4" style={{ color: 'var(--accent)' }} />
