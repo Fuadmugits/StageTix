@@ -45,7 +45,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
             tierName: t.tier_name,
             seatNumber: t.seat_number,
             holderName: t.holder_name,
-            qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(t.ticket_code)}`,
+            qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&ecc=M&data=${encodeURIComponent(t.ticket_code)}`,
             status: t.status,
           });
         }
@@ -81,7 +81,7 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                   tierName: tierName + (qty > 1 ? ` (${qty} Pax)` : ''),
                   seatNumber: gate,
                   holderName: parsed.customer?.fullName || 'Ticket Holder',
-                  qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(baseId)}`,
+                  qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&ecc=M&data=${encodeURIComponent(baseId)}`,
                   status: 'ACTIVE',
                 });
                 return;

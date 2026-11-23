@@ -171,10 +171,11 @@ export default function GateScannerPage() {
       await html5QrCodeRef.current.start(
         { facingMode: 'environment' },
         {
-          fps: 15,
+          fps: 25, // Higher frame rate for snappier scanning
           qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * 0.8);
+            // Larger detection bounding box to catch QR from various distances easily
+            const qrboxSize = Math.floor(minEdge * 0.88);
             return {
               width: qrboxSize,
               height: qrboxSize
@@ -182,6 +183,9 @@ export default function GateScannerPage() {
           },
           aspectRatio: 1.0,
           disableFlip: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true // Native hardware acceleration on modern Chrome/Android/iOS
+          }
         },
         qrCodeSuccessCallback,
         undefined
