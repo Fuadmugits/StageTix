@@ -77,6 +77,9 @@ export interface ApiConcert {
   is_popular: boolean;
   is_selling_fast: boolean;
   min_price: number;
+  total_stock?: number;
+  remaining_stock?: number;
+  is_sold_out?: boolean;
   ticket_tiers: ApiTicketTier[];
 }
 

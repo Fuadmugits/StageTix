@@ -307,15 +307,20 @@ export default function ConcertDetailPage({ params }: { params: Promise<{ id: st
               <div className="space-y-4">
                 {concert.ticketTiers.map((tier) => {
                   const isSelected = selectedTier.id === tier.id;
+                  const isSoldOut = tier.available <= 0;
                   return (
                     <div
                       key={tier.id}
-                      onClick={() => setSelectedTier(tier)}
-                      className="glass-card p-6 cursor-pointer transition-all rounded-2xl"
+                      onClick={() => {
+                        if (!isSoldOut) setSelectedTier(tier);
+                      }}
+                      className={`glass-card p-6 transition-all rounded-2xl ${isSoldOut ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                       style={
-                        isSelected
-                          ? { border: '2px solid var(--accent)', background: 'var(--accent-subtle)', boxShadow: 'var(--shadow-md)' }
-                          : { border: '1px solid var(--border-color)', background: 'var(--bg-card)' }
+                        isSoldOut
+                          ? { border: '1px solid var(--border-color)', background: 'var(--bg-card)' }
+                          : isSelected
+                            ? { border: '2px solid var(--accent)', background: 'var(--accent-subtle)', boxShadow: 'var(--shadow-md)' }
+                            : { border: '1px solid var(--border-color)', background: 'var(--bg-card)' }
                       }
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -332,6 +337,15 @@ export default function ConcertDetailPage({ params }: { params: Promise<{ id: st
                               {isSelected && <Check className="w-3 h-3 text-white" />}
                             </div>
                             <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{tier.name}</h3>
+                            {isSoldOut ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                HABIS
+                              </span>
+                            ) : tier.available <= 20 ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse">
+                                TINGGAL {tier.available} TIKET!
+                              </span>
+                            ) : null}
                           </div>
                           <p className="text-xs pl-8" style={{ color: 'var(--text-muted)' }}>{tier.description}</p>
                           
@@ -349,8 +363,8 @@ export default function ConcertDetailPage({ params }: { params: Promise<{ id: st
                           <div className="text-xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
                             Rp {tier.price.toLocaleString('id-ID')}
                           </div>
-                          <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            {tier.available} tickets left
+                          <div className={`text-[11px] mt-0.5 font-bold ${isSoldOut ? 'text-rose-400 font-mono' : 'text-emerald-400'}`}>
+                            {isSoldOut ? 'Sold Out' : `Sisa ${tier.available} tiket`}
                           </div>
                         </div>
                       </div>

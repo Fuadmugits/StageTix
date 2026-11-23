@@ -23,6 +23,9 @@ export interface Concert {
   isPopular?: boolean;
   isSellingFast?: boolean;
   minPrice: number;
+  totalStock?: number;
+  remainingStock?: number;
+  isSoldOut?: boolean;
   ticketTiers: TicketTier[];
 }
 

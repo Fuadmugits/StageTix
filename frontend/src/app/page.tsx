@@ -53,6 +53,9 @@ function mapApiConcert(c: ApiConcert): Concert {
     isPopular: c.is_popular,
     isSellingFast: c.is_selling_fast,
     minPrice: c.min_price,
+    totalStock: c.total_stock,
+    remainingStock: c.remaining_stock,
+    isSoldOut: c.is_sold_out,
     ticketTiers: (c.ticket_tiers || []).map(t => ({
       id: String(t.id),
       name: t.name,
