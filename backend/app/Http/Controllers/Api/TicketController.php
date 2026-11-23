@@ -28,36 +28,43 @@ class TicketController extends Controller
     }
 
     /**
-     * Show ticket details by code or order number
+     * Show ticket details by code or order number (supports multi-ticket orders)
      */
     public function show(string $ticketCode): JsonResponse
     {
         $code = trim($ticketCode);
+        
+        // Check if query matches a specific ticket directly
         $ticket = Ticket::with(['order.concert', 'order.items.tier'])
             ->where('ticket_code', $code)
-            ->orWhereHas('order', function ($q) use ($code) {
-                $q->where('order_number', $code);
-            })
             ->first();
 
-        // If ticket not found yet but follows STX- order format, find or initialize it
-        if (!$ticket && str_starts_with($code, 'STX-')) {
-            $order = Order::with('items.tier')->where('order_number', $code)->first();
+        // If not found by direct ticket code, check by order number
+        if (!$ticket) {
+            $order = Order::with(['concert', 'items.tier', 'tickets'])->where('order_number', $code)->first();
             if ($order) {
-                $itemTier = $order->items->first()?->tier?->name ?? 'Cat 3 (Restricted View)';
-                $dedicatedGate = self::getDedicatedGate($itemTier);
-                $ticket = Ticket::firstOrCreate(
-                    ['order_id' => $order->id],
-                    [
-                        'ticket_code' => $order->order_number,
-                        'tier_name' => $itemTier,
-                        'seat_number' => $dedicatedGate,
-                        'holder_name' => $order->customer_name,
-                        'qr_code_data' => $order->order_number,
-                        'status' => 'ACTIVE',
-                    ]
-                );
-                $ticket->load(['order.concert']);
+                // If order exists and already has multiple generated tickets, use the first one or generate them
+                $existingTickets = Ticket::where('order_id', $order->id)->get();
+                
+                if ($existingTickets->isEmpty()) {
+                    $totalQty = $order->items->sum('quantity') ?: 1;
+                    $itemTier = $order->items->first()?->tier?->name ?? 'Cat 3 (Restricted View)';
+                    $dedicatedGate = self::getDedicatedGate($itemTier);
+
+                    for ($i = 1; $i <= $totalQty; $i++) {
+                        $uniqueCode = $totalQty > 1 ? "{$order->order_number}-T{$i}" : $order->order_number;
+                        Ticket::create([
+                            'order_id' => $order->id,
+                            'ticket_code' => $uniqueCode,
+                            'tier_name' => $itemTier,
+                            'seat_number' => "{$dedicatedGate} • Seat #0{$i}",
+                            'holder_name' => "{$order->customer_name} (Tiket {$i})",
+                            'qr_code_data' => $uniqueCode,
+                            'status' => 'ACTIVE',
+                        ]);
+                    }
+                }
+                $ticket = Ticket::with(['order.concert', 'order.items.tier'])->where('order_id', $order->id)->first();
             }
         }
 
@@ -74,9 +81,25 @@ class TicketController extends Controller
             $ticket->seat_number = $dedicatedGate;
         }
 
+        // Fetch all brother/sister tickets belonging to the same order so user can view all passes
+        $orderTickets = Ticket::where('order_id', $ticket->order_id)->get()->map(function ($t) {
+            $gate = self::getDedicatedGate($t->tier_name);
+            return [
+                'id' => $t->ticket_code,
+                'ticket_code' => $t->ticket_code,
+                'tier_name' => $t->tier_name,
+                'seat_number' => $t->seat_number ?: $gate,
+                'holder_name' => $t->holder_name,
+                'status' => $t->status,
+                'scanned_at' => $t->scanned_at,
+                'qr_code' => "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" . urlencode($t->ticket_code),
+            ];
+        });
+
         return response()->json([
             'status' => 'success',
-            'data' => $ticket
+            'data' => $ticket,
+            'all_tickets' => $orderTickets
         ]);
     }
 
