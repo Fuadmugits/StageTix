@@ -91,9 +91,10 @@ export default function GateScannerPage() {
       ]);
     } catch (err: any) {
       const msg = err.message || 'Ticket scanning failed.';
-      let resultType: 'ALREADY_USED' | 'INVALID' | 'UNPAID' = 'INVALID';
+      let resultType: 'ALREADY_USED' | 'INVALID' | 'UNPAID' | 'WRONG_GATE' = 'INVALID';
       
       if (msg.includes('ALREADY')) resultType = 'ALREADY_USED';
+      else if (msg.includes('WRONG GATE') || msg.includes('SALAH GERBANG')) resultType = 'WRONG_GATE';
       else if (msg.includes('unpaid') || msg.includes('expired')) resultType = 'UNPAID';
 
       setScanResult({
@@ -104,7 +105,7 @@ export default function GateScannerPage() {
       setScanHistory(prev => [
         {
           code: cleanCode,
-          status: resultType === 'ALREADY_USED' ? 'DUPLICATE' : 'INVALID',
+          status: resultType === 'ALREADY_USED' ? 'DUPLICATE' : resultType === 'WRONG_GATE' ? 'WRONG GATE' : 'INVALID',
           time: new Date().toLocaleTimeString(),
           holder: 'Unknown / Invalid',
         },
@@ -508,6 +509,7 @@ export default function GateScannerPage() {
                   }`}>
                     {scanResult.result === 'GRANTED' && <CheckCircle2 className="w-8 h-8" />}
                     {scanResult.result === 'ALREADY_USED' && <AlertTriangle className="w-8 h-8" />}
+                    {scanResult.result === 'WRONG_GATE' && <AlertTriangle className="w-8 h-8 text-rose-400" />}
                     {scanResult.result === 'INVALID' && <XCircle className="w-8 h-8" />}
                     {scanResult.result === 'UNPAID' && <AlertTriangle className="w-8 h-8" />}
                   </div>

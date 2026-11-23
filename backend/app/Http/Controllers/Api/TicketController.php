@@ -12,12 +12,28 @@ use Illuminate\Http\Request;
 class TicketController extends Controller
 {
     /**
+     * Map ticket category to its dedicated entry gate
+     */
+    public static function getDedicatedGate(string $tierName): string
+    {
+        $lower = strtolower($tierName);
+        if (str_contains($lower, 'vip') || str_contains($lower, 'soundcheck') || str_contains($lower, 'lounge')) {
+            return 'Gate B - VIP & Fast Track';
+        }
+        if (str_contains($lower, 'cat 1') || str_contains($lower, 'cat 2') || str_contains($lower, 'tribun') || str_contains($lower, 'seated')) {
+            return 'Gate C - East Gate';
+        }
+        // Cat 3, Festival, GA, and others
+        return 'Gate A - Main Entrance';
+    }
+
+    /**
      * Show ticket details by code or order number
      */
     public function show(string $ticketCode): JsonResponse
     {
         $code = trim($ticketCode);
-        $ticket = Ticket::with(['order.concert'])
+        $ticket = Ticket::with(['order.concert', 'order.items.tier'])
             ->where('ticket_code', $code)
             ->orWhereHas('order', function ($q) use ($code) {
                 $q->where('order_number', $code);
@@ -26,14 +42,16 @@ class TicketController extends Controller
 
         // If ticket not found yet but follows STX- order format, find or initialize it
         if (!$ticket && str_starts_with($code, 'STX-')) {
-            $order = Order::where('order_number', $code)->first();
+            $order = Order::with('items.tier')->where('order_number', $code)->first();
             if ($order) {
+                $itemTier = $order->items->first()?->tier?->name ?? 'Cat 3 (Restricted View)';
+                $dedicatedGate = self::getDedicatedGate($itemTier);
                 $ticket = Ticket::firstOrCreate(
                     ['order_id' => $order->id],
                     [
                         'ticket_code' => $order->order_number,
-                        'tier_name' => 'General / Festival',
-                        'seat_number' => 'GATE ENTRY',
+                        'tier_name' => $itemTier,
+                        'seat_number' => $dedicatedGate,
                         'holder_name' => $order->customer_name,
                         'qr_code_data' => $order->order_number,
                         'status' => 'ACTIVE',
@@ -48,6 +66,12 @@ class TicketController extends Controller
                 'status' => 'error',
                 'message' => 'Ticket code not found.'
             ], 404);
+        }
+
+        // Attach dedicated gate dynamically if not already assigned
+        $dedicatedGate = self::getDedicatedGate($ticket->tier_name);
+        if (!$ticket->seat_number || $ticket->seat_number === 'GATE ENTRY' || str_starts_with($ticket->seat_number, 'GA-')) {
+            $ticket->seat_number = $dedicatedGate;
         }
 
         return response()->json([
@@ -105,7 +129,10 @@ class TicketController extends Controller
             // If ticket still doesn't exist in DB (e.g. demo offline checkout or generated Order ID)
             if (!$ticket && str_starts_with($code, 'STX-')) {
                 // Find or auto-create order record for this STX order code
-                $order = Order::where('order_number', $code)->first();
+                $order = Order::with('items.tier')->where('order_number', $code)->first();
+                $itemTier = $order?->items?->first()?->tier?->name ?? 'Cat 3 (Restricted View)';
+                $dedicatedGate = self::getDedicatedGate($itemTier);
+
                 if (!$order) {
                     $concert = Concert::first();
                     $order = Order::create([
@@ -127,8 +154,8 @@ class TicketController extends Controller
                 $ticket = Ticket::create([
                     'order_id' => $order->id,
                     'ticket_code' => $code, // Use exact scanned/input code so subsequent scans match immediately
-                    'tier_name' => 'VIP / General Admission',
-                    'seat_number' => 'GATE-ENTRY-01',
+                    'tier_name' => $itemTier,
+                    'seat_number' => $dedicatedGate,
                     'holder_name' => $order->customer_name,
                     'qr_code_data' => $code,
                     'status' => 'ACTIVE',
@@ -164,6 +191,35 @@ class TicketController extends Controller
                     'message' => 'ACCESS DENIED: Ticket order status is unpaid or expired.',
                     'data' => $ticket
                 ], 403);
+            }
+
+            // ==========================================
+            // GATE MATCHING ENFORCEMENT
+            // ==========================================
+            $assignedGate = self::getDedicatedGate($ticket->tier_name);
+            $selectedGate = trim($validated['gate_name'] ?? '');
+
+            if (!empty($selectedGate)) {
+                // Check if gate matches required category gate
+                $cleanAssigned = strtolower(explode('-', $assignedGate)[0] ?? $assignedGate); // 'gate a', 'gate b', 'gate c'
+                $cleanSelected = strtolower(explode('-', $selectedGate)[0] ?? $selectedGate);
+
+                if (!str_contains($cleanSelected, trim($cleanAssigned)) && !str_contains($cleanAssigned, trim($cleanSelected))) {
+                    return response()->json([
+                        'status' => 'error',
+                        'result' => 'WRONG_GATE',
+                        'message' => "SALAH GERBANG (WRONG GATE)! Kategori tiket [{$ticket->tier_name}] harus masuk melalui [{$assignedGate}], bukan [{$selectedGate}].",
+                        'data' => [
+                            'ticket_code' => $ticket->ticket_code,
+                            'holder_name' => $ticket->holder_name,
+                            'tier_name' => $ticket->tier_name,
+                            'seat_number' => $assignedGate,
+                            'required_gate' => $assignedGate,
+                            'attempted_gate' => $selectedGate,
+                            'concert_title' => $ticket->order->concert->title ?? 'StageTix Concert',
+                        ]
+                    ], 422);
+                }
             }
 
             // Redeem ticket atomically
