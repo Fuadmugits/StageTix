@@ -225,12 +225,59 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
 
             {/* QR Code Entry Pass */}
             <div className="pt-6 text-center space-y-4" style={{ borderTop: '2px dashed var(--border-color)' }}>
-              <div className="bg-white p-4 inline-block rounded-2xl shadow-xl border" style={{ borderColor: 'var(--border-color)' }}>
-                <img 
-                  src={ticket.qrCode} 
-                  alt="QR Code Tiket" 
-                  className="w-48 h-48 mx-auto object-contain"
-                />
+              <div className="relative inline-block">
+                <div className="bg-white p-4 inline-block rounded-2xl shadow-xl border" style={{ borderColor: 'var(--border-color)' }}>
+                  <img 
+                    id="ticket-qr-img"
+                    src={ticket.qrCode} 
+                    alt="QR Code Tiket" 
+                    className="w-48 h-48 mx-auto object-contain"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+                {ticket.status === 'USED' && (
+                  <div className="absolute inset-0 bg-black/75 rounded-2xl flex flex-col items-center justify-center p-4 backdrop-blur-sm">
+                    <span className="px-3 py-1 bg-rose-600 text-white text-xs font-black uppercase rounded-lg shadow-lg tracking-wider mb-1">
+                      SUDAH DIGUNAKAN
+                    </span>
+                    <span className="text-[10px] text-slate-300 font-mono">
+                      Check-in Gate Verified
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Direct Download QR Image Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(ticket.qrCode);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `QR-Tiket-${ticket.id}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    } catch {
+                      // Fallback: open in new tab
+                      window.open(ticket.qrCode, '_blank');
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm hover:scale-105"
+                  style={{ 
+                    background: 'var(--bg-elevated)', 
+                    color: 'var(--accent)', 
+                    border: '1px solid var(--border-color)' 
+                  }}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Simpan Gambar QR Code (PNG)
+                </button>
               </div>
 
               <div className="space-y-2">
@@ -240,10 +287,10 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 </div>
                 <div className="text-xs font-semibold flex items-center justify-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                   <QrCode className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                  Tunjukkan QR code ini kepada petugas saat check-in di gate konser
+                  Tunjukkan QR code atau Kode di atas kepada petugas check-in
                 </div>
                 <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  Jangan bagikan kode QR kepada orang lain untuk menghindari penyalahgunaan tiket.
+                  ⚠️ Tiket ini bersifat <strong>Single-Use</strong>. Sekali kode / QR discan dan dinyatakan valid oleh gate scanner, tiket otomatis berstatus <span className="text-rose-400 font-bold">USED</span> dan tidak dapat digunakan kembali.
                 </p>
               </div>
             </div>

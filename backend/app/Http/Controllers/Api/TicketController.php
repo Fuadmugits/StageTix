@@ -12,19 +12,42 @@ use Illuminate\Http\Request;
 class TicketController extends Controller
 {
     /**
-     * Show ticket details by code
+     * Show ticket details by code or order number
      */
     public function show(string $ticketCode): JsonResponse
     {
+        $code = trim($ticketCode);
         $ticket = Ticket::with(['order.concert'])
-            ->where('ticket_code', $ticketCode)
+            ->where('ticket_code', $code)
+            ->orWhereHas('order', function ($q) use ($code) {
+                $q->where('order_number', $code);
+            })
             ->first();
+
+        // If ticket not found yet but follows STX- order format, find or initialize it
+        if (!$ticket && str_starts_with($code, 'STX-')) {
+            $order = Order::where('order_number', $code)->first();
+            if ($order) {
+                $ticket = Ticket::firstOrCreate(
+                    ['order_id' => $order->id],
+                    [
+                        'ticket_code' => $order->order_number,
+                        'tier_name' => 'General / Festival',
+                        'seat_number' => 'GATE ENTRY',
+                        'holder_name' => $order->customer_name,
+                        'qr_code_data' => $order->order_number,
+                        'status' => 'ACTIVE',
+                    ]
+                );
+                $ticket->load(['order.concert']);
+            }
+        }
 
         if (!$ticket) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Ticket code not found.'
-            ], 440);
+            ], 404);
         }
 
         return response()->json([
@@ -103,7 +126,7 @@ class TicketController extends Controller
 
                 $ticket = Ticket::create([
                     'order_id' => $order->id,
-                    'ticket_code' => 'TCK-' . strtoupper(\Illuminate\Support\Str::random(10)),
+                    'ticket_code' => $code, // Use exact scanned/input code so subsequent scans match immediately
                     'tier_name' => 'VIP / General Admission',
                     'seat_number' => 'GATE-ENTRY-01',
                     'holder_name' => $order->customer_name,
