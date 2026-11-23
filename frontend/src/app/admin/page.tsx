@@ -620,33 +620,41 @@ export default function AdminPortalPage() {
                       <BarChart3 className="w-5 h-5 text-[#7c5cff]" />
                       <h3 className="text-base font-bold text-white">Distribusi Kuota &amp; Kategori Tiket</h3>
                     </div>
-                    <span className="text-xs text-slate-400">Sheila on 7 - Live Jakarta</span>
+                    <span className="text-xs text-slate-400">
+                      {stats?.tier_distribution?.concert_title || 'Sinkronisasi Database Live'}
+                    </span>
                   </div>
 
                   <div className="space-y-4">
-                    {[
-                      { name: 'VIP Soundcheck Lounge', price: 'Rp 2.500.000', sold: 500, cap: 500, color: 'bg-[#ff4d8d]' },
-                      { name: 'Festival A (Depan Panggung)', price: 'Rp 1.500.000', sold: 2500, cap: 2500, color: 'bg-[#7c5cff]' },
-                      { name: 'Festival B (Tengah)', price: 'Rp 950.000', sold: 3000, cap: 3000, color: 'bg-emerald-400' },
-                      { name: 'Cat 1 Tribun Seated', price: 'Rp 750.000', sold: 2500, cap: 2500, color: 'bg-amber-400' },
-                    ].map((tier, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-[#181824] border border-[#2D2D42] space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <div>
-                            <span className="font-bold text-white">{tier.name}</span>
-                            <span className="text-slate-400 ml-2 font-mono">{tier.price}</span>
+                    {stats?.tier_distribution?.tiers && stats.tier_distribution.tiers.length > 0 ? (
+                      stats.tier_distribution.tiers.map((tier: any, idx: number) => (
+                        <div key={idx} className="p-4 rounded-2xl bg-[#181824] border border-[#2D2D42] space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <div>
+                              <span className="font-bold text-white">{tier.name}</span>
+                              <span className="text-slate-400 ml-2 font-mono">{tier.price}</span>
+                            </div>
+                            <span className={`font-mono font-bold ${tier.is_sold_out ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {tier.is_sold_out ? 'SOLD OUT' : `${tier.percentage}% TERJUAL`}
+                            </span>
                           </div>
-                          <span className="font-mono text-emerald-400 font-bold">100% SOLD OUT</span>
+                          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${tier.color || 'bg-emerald-400'} rounded-full transition-all duration-500`} 
+                              style={{ width: `${Math.min(100, Math.max(tier.percentage, 5))}%` }} 
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                            <span>Terjual: {tier.sold} tiket</span>
+                            <span>Sisa Kuota: {tier.available} / {tier.cap} tiket</span>
+                          </div>
                         </div>
-                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                          <div className={`h-full ${tier.color} rounded-full`} style={{ width: '100%' }} />
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-                          <span>Terjual: {tier.sold} tiket</span>
-                          <span>Kapasitas: {tier.cap} tiket</span>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-xs text-slate-500">
+                        Tidak ada data kuota tiket aktif.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               </div>
@@ -725,29 +733,50 @@ export default function AdminPortalPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { gate: 'Gate A - Main Entrance', scanner: 'Bagas Aditya (Staff Gate A)', status: 'ACTIVE', scanned: 1840, target: 2500 },
-                { gate: 'Gate B - East Wing', scanner: 'Nadia S. (Staff Gate B)', status: 'ACTIVE', scanned: 2150, target: 3000 },
-                { gate: 'Gate C - VIP Soundcheck', scanner: 'Rafi P. (Staff VIP)', status: 'ACTIVE', scanned: 495, target: 500 },
-              ].map((gt, idx) => (
-                <div key={idx} className="p-6 rounded-2xl bg-[#181824] border border-[#2D2D42] space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-sm">{gt.gate}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      {gt.status}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400">Petugas: <strong className="text-slate-200">{gt.scanner}</strong></div>
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-slate-400">Progres Gate</span>
-                      <span className="font-mono text-emerald-400 font-bold">{gt.scanned} / {gt.target}</span>
+                { 
+                  gate: 'Gate A - Main Entrance', 
+                  scanner: 'Petugas Scan Aktif', 
+                  status: (stats?.tickets?.scanned || 0) > 0 ? 'ACTIVE' : 'READY', 
+                  scanned: stats?.tickets?.scanned || 0, 
+                  target: stats?.tickets?.total || 1 
+                },
+                { 
+                  gate: 'Gate B - East Wing', 
+                  scanner: 'Sistem Terhubung', 
+                  status: 'READY', 
+                  scanned: 0, 
+                  target: stats?.tickets?.total || 1 
+                },
+                { 
+                  gate: 'Gate C - VIP Entrance', 
+                  scanner: 'Sistem Terhubung', 
+                  status: 'READY', 
+                  scanned: 0, 
+                  target: stats?.tickets?.total || 1 
+                },
+              ].map((gt, idx) => {
+                const pct = Math.min(100, Math.round((gt.scanned / gt.target) * 100));
+                return (
+                  <div key={idx} className="p-6 rounded-2xl bg-[#181824] border border-[#2D2D42] space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-sm">{gt.gate}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        {gt.status}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${(gt.scanned / gt.target) * 100}%` }} />
+                    <div className="text-xs text-slate-400">Status: <strong className="text-slate-200">{gt.scanner}</strong></div>
+                    <div>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-slate-400">Progres Gate Scan</span>
+                        <span className="font-mono text-emerald-400 font-bold">{gt.scanned} / {gt.target} ({pct}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div className="bg-emerald-400 h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

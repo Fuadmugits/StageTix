@@ -186,7 +186,47 @@ class TicketController extends Controller
             ->where('status', 'USED')
             ->orderBy('scanned_at', 'desc')
             ->take(5)
-            ->get();
+            ->get()
+            ->map(function ($ticket) {
+                return [
+                    'code' => $ticket->ticket_code,
+                    'tier' => $ticket->tier_name,
+                    'holder' => $ticket->holder_name,
+                    'concert' => $ticket->order->concert->title ?? 'StageTix Concert',
+                    'gate' => 'Main Gate Entrance',
+                    'status' => 'GRANTED',
+                    'time' => $ticket->scanned_at ? $ticket->scanned_at->diffForHumans() : 'baru saja',
+                ];
+            });
+
+        // Get live ticket tiers across concerts (or prominent active concert)
+        $prominentConcert = Concert::with('ticketTiers')->orderBy('date', 'asc')->first();
+        $tierDistribution = [];
+        $concertTitle = $prominentConcert ? $prominentConcert->title : 'Konser StageTix';
+
+        if ($prominentConcert && $prominentConcert->ticketTiers) {
+            $colors = ['bg-[#ff4d8d]', 'bg-[#7c5cff]', 'bg-emerald-400', 'bg-amber-400', 'bg-cyan-400', 'bg-indigo-400'];
+            foreach ($prominentConcert->ticketTiers as $idx => $tier) {
+                $total = (int) $tier->total_quantity;
+                $avail = (int) $tier->available_quantity;
+                $sold = max(0, $total - $avail);
+                $percentage = $total > 0 ? round(($sold / $total) * 100, 1) : 0;
+                $isSoldOut = $avail <= 0;
+
+                $tierDistribution[] = [
+                    'id' => $tier->id,
+                    'name' => $tier->name,
+                    'price' => 'Rp ' . number_format($tier->price, 0, ',', '.'),
+                    'raw_price' => $tier->price,
+                    'sold' => $sold,
+                    'cap' => $total,
+                    'available' => $avail,
+                    'percentage' => $percentage,
+                    'is_sold_out' => $isSoldOut,
+                    'color' => $colors[$idx % count($colors)],
+                ];
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -201,7 +241,11 @@ class TicketController extends Controller
                     'active' => $activeTickets,
                     'scan_rate_percentage' => $scanRate
                 ],
-                'recent_scans' => $recentScans
+                'recent_scans' => $recentScans,
+                'tier_distribution' => [
+                    'concert_title' => $concertTitle,
+                    'tiers' => $tierDistribution,
+                ]
             ]
         ]);
     }
