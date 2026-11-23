@@ -43,9 +43,11 @@ class TicketController extends Controller
 
         // If ticket not found yet but follows STX- order format, find or initialize 1 unified ticket
         if (!$ticket && str_starts_with($code, 'STX-')) {
-            $order = Order::with('items.tier')->where('order_number', $code)->first();
+            $order = Order::with('items.ticketTier')->where('order_number', $code)->first();
             if ($order) {
-                $itemTier = $order->items->first()?->tier?->name ?? 'Cat 3 (Restricted View)';
+                // Read exact tier name from OrderItem record
+                $firstItem = $order->items->first();
+                $itemTier = $firstItem?->tier_name ?: ($firstItem?->ticketTier?->name ?? 'VIP / General Admission');
                 $dedicatedGate = self::getDedicatedGate($itemTier);
                 $totalQty = $order->items->sum('quantity') ?: 1;
 
@@ -132,8 +134,9 @@ class TicketController extends Controller
             // If ticket still doesn't exist in DB (e.g. demo offline checkout or generated Order ID)
             if (!$ticket && str_starts_with($code, 'STX-')) {
                 // Find or auto-create order record for this STX order code
-                $order = Order::with('items.tier')->where('order_number', $code)->first();
-                $itemTier = $order?->items?->first()?->tier?->name ?? 'Cat 3 (Restricted View)';
+                $order = Order::with('items.ticketTier')->where('order_number', $code)->first();
+                $firstItem = $order?->items?->first();
+                $itemTier = $firstItem?->tier_name ?: ($firstItem?->ticketTier?->name ?? 'VIP / General Admission');
                 $dedicatedGate = self::getDedicatedGate($itemTier);
 
                 if (!$order) {

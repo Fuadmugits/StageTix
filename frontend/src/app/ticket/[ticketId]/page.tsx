@@ -63,6 +63,13 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                 const qty = parsed.items?.[0]?.quantity || 1;
                 const baseId = resolvedParams.ticketId || lastTicketCode || parsed.id;
                 
+                const tierName = parsed.items?.[0]?.tierName || parsed.tierName || 'VIP Ultimate Experience';
+                const gate = tierName.toLowerCase().includes('vip') || tierName.toLowerCase().includes('soundcheck')
+                  ? 'Gate B - VIP & Fast Track'
+                  : tierName.toLowerCase().includes('cat 1') || tierName.toLowerCase().includes('cat 2')
+                  ? 'Gate C - East Gate'
+                  : 'Gate A - Main Entrance';
+
                 setTicket({
                   id: baseId,
                   orderId: parsed.id,
@@ -71,8 +78,8 @@ export default function TicketPage({ params }: { params: Promise<{ ticketId: str
                   venue: parsed.concertVenue,
                   date: parsed.concertDate,
                   time: '19:00 WIB',
-                  tierName: parsed.tierName + (qty > 1 ? ` (${qty} Pax)` : ''),
-                  seatNumber: 'Gate A - Main Entrance',
+                  tierName: tierName + (qty > 1 ? ` (${qty} Pax)` : ''),
+                  seatNumber: gate,
                   holderName: parsed.customer?.fullName || 'Ticket Holder',
                   qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(baseId)}`,
                   status: 'ACTIVE',
